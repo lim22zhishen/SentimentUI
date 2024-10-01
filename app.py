@@ -3,11 +3,15 @@ from transformers import pipeline
 import pandas as pd
 import plotly.express as px
 import datetime
+import os
 
-# Initialize the multilingual sentiment analysis model
-sentiment_pipeline = pipeline("sentiment-analysis", model="cardiffnlp/twitter-xlm-roberta-base-sentiment")
+# Disable GPU computation (Force CPU usage)
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-# Function to analyze sentiment of each sentence
+# Use a smaller and lighter model (distilbert instead of XLM-Roberta)
+sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+
+# Function to analyze sentiment of each sentence in a memory-efficient way
 def analyze_sentiment(text):
     result = sentiment_pipeline(text)[0]
     return result['label'], result['score']
@@ -15,29 +19,41 @@ def analyze_sentiment(text):
 # Streamlit UI
 st.title("Sentiment Analysis of Customer Conversations")
 
-# Input section for a customer service conversation
+# Input section for customer service conversation
 st.write("Enter a customer service conversation (each line is a new interaction between customer and service agent):")
 conversation = st.text_area("Conversation", height=300, placeholder="Enter customer-service interaction here...")
 
-# Initialize an empty DataFrame for the conversation and sentiment analysis
+# Initialize an empty DataFrame for sentiment analysis
 if conversation:
-    # Split the conversation into separate messages (each line is a new message)
+    # Split conversation into separate messages (lines) for chunked processing
     messages = conversation.split("\n")
     
-    # Analyze each message for sentiment
+    # Limit processing of large conversations (for memory optimization)
+    MAX_MESSAGES = 20  # Only process up to 20 messages at once (modify if needed)
+    if len(messages) > MAX_MESSAGES:
+        st.warning(f"Only analyzing the first {MAX_MESSAGES} messages for memory efficiency.")
+        messages = messages[:MAX_MESSAGES]
+
+    # Analyze each message for sentiment in small chunks
     sentiments = []
     for msg in messages:
-        label, score = analyze_sentiment(msg)
-        sentiments.append({"timestamp": datetime.datetime.now(), "text": msg, "sentiment": label, "score": score})
+        if msg.strip():  # Ignore empty lines
+            label, score = analyze_sentiment(msg)
+            sentiments.append({
+                "timestamp": datetime.datetime.now(), 
+                "text": msg, 
+                "sentiment": label, 
+                "score": score
+            })
 
     # Convert the results into a DataFrame
     df = pd.DataFrame(sentiments)
 
-    # Display DataFrame of results
+    # Display the DataFrame
     st.write("Sentiment Analysis Results:")
     st.dataframe(df)
 
-    # Plotting sentiment over time using Plotly
+    # Plot sentiment over time using Plotly (optimize for small datasets)
     fig = px.line(df, x='timestamp', y='score', color='sentiment', title="Sentiment Score Over Time", markers=True)
     st.plotly_chart(fig)
 
@@ -48,4 +64,3 @@ if conversation:
 
 else:
     st.write("Please enter a conversation above to see the sentiment analysis.")
-
