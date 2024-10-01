@@ -5,9 +5,6 @@ import plotly.express as px
 import datetime
 import os
 
-# Disable GPU computation (Force CPU usage)
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
-
 # Use a smaller and lighter model (distilbert instead of XLM-Roberta)
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 
@@ -40,27 +37,31 @@ if st.button('Run Sentiment Analysis'):
         for msg in messages:
             if msg.strip():  # Ignore empty lines
                 label, score = analyze_sentiment(msg)
+                
+                # Split each message into speaker and message (for improved readability)
+                if ": " in msg:
+                    speaker, content = msg.split(": ", 1)
+                else:
+                    speaker, content = "Unknown", msg
+
                 sentiments.append({
-                    "timestamp": datetime.datetime.now(), 
-                    "text": msg, 
-                    "sentiment": label, 
-                    "score": score
+                    "Timestamp": datetime.datetime.now(), 
+                    "Speaker": speaker, 
+                    "Message": content, 
+                    "Sentiment": label, 
+                    "Score": round(score, 2)
                 })
 
         # Convert the results into a DataFrame
         df = pd.DataFrame(sentiments)
 
-        # Display the DataFrame
-        st.write("Sentiment Analysis Results:")
-        st.dataframe(df)
+        # Display the DataFrame in a readable table format
+        st.write("Conversation with Sentiment Labels:")
+        st.table(df)
 
         # Plot sentiment over time using Plotly (optimize for small datasets)
-        fig = px.line(df, x='timestamp', y='score', color='sentiment', title="Sentiment Score Over Time", markers=True)
+        fig = px.line(df, x='Timestamp', y='Score', color='Sentiment', title="Sentiment Score Over Time", markers=True)
         st.plotly_chart(fig)
 
-        # Show conversation with sentiment labels
-        st.write("Conversation with Sentiment Labels:")
-        for i, row in df.iterrows():
-            st.write(f"{row['timestamp']} - {row['text']} -> {row['sentiment']} (Score: {row['score']:.2f})")
     else:
         st.warning("Please enter a conversation before running the analysis.")
