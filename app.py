@@ -11,8 +11,19 @@ sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncas
 # Function to analyze sentiment of each sentence in a memory-efficient way
 def analyze_sentiment(text):
     result = sentiment_pipeline(text)[0]
-    return result['label'], result['score']
+    label = result['label']
+    score = result['score']
+    
+    # Map score to -5 to 5 scale
+    if label == "POSITIVE":
+        # Scale the score from 0.5 to 1 to 0 to 5
+        new_score = 5 * (score - 0.5) / 0.5  # Scaling
+    else:  # Assuming it's NEGATIVE
+        # Scale the score from 0 to 0.5 to 0 to -5
+        new_score = -5 * (1 - score) / 0.5  # Scaling
 
+    return label, round(new_score, 2)  # Return rounded score for readability
+    
 # Streamlit UI
 st.title("Sentiment Analysis of Customer Conversations")
 
