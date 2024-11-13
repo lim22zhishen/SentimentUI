@@ -44,9 +44,7 @@ def transcribe_audio(audio_file):
             return "Could not transcribe the audio"
         except sr.RequestError:
             return "STT service is unavailable"
-    finally:
-        os.remove("temp.wav")  # Clean up temp file
-
+            
 # Streamlit UI
 st.title("Sentiment Analysis of Customer Conversations (Text and Audio)")
 
