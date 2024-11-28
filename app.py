@@ -1,12 +1,18 @@
 import streamlit as st
-from transformers import pipeline
 import pandas as pd
 import plotly.express as px
 import datetime
+import whisper
+from transformers import pipeline
 
-# Load Sentiment and ASR pipelines
+# Load Whisper model and sentiment analysis pipeline
+whisper_model = whisper.load_model("base")  # You can use "tiny", "base", "small", "medium", "large"
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
-asr_pipeline = pipeline("automatic-speech-recognition", model="facebook/wav2vec2-large-960h")
+
+# Function to transcribe audio
+def transcribe_audio_whisper(audio_path):
+    result = whisper_model.transcribe(audio_path)
+    return result["text"]
 
 # Function to analyze sentiment
 def analyze_sentiment(text):
@@ -23,22 +29,26 @@ def analyze_sentiment(text):
     return label, round(new_score, 2)
 
 # Streamlit UI
-st.title("Sentiment Analysis of Customer Conversations (Text and Audio)")
+st.title("Sentiment Analysis with OpenAI Whisper (Audio and Text)")
 
-# Audio Upload Section
+# Upload audio file
 st.subheader("Upload an Audio File")
-audio_file = st.file_uploader("Choose an audio file (WAV format recommended)", type=["wav"])
+audio_file = st.file_uploader("Choose an audio file (e.g., WAV, MP3, etc.)", type=["wav", "mp3", "m4a"])
 
 if audio_file is not None:
-    st.write("Processing audio...")
-
-    # Transcribe audio using Hugging Face ASR
+    # Save audio file locally
+    audio_path = f"temp_audio.{audio_file.name.split('.')[-1]}"
+    with open(audio_path, "wb") as f:
+        f.write(audio_file.read())
+    
+    # Transcribe audio
+    st.write("Transcribing audio using OpenAI Whisper...")
     try:
-        transcript = asr_pipeline(audio_file.read())["text"]
+        transcript = transcribe_audio_whisper(audio_path)
         st.write("Transcription:")
         st.text_area("Transcript", transcript, height=150, disabled=True)
 
-        # Sentiment analysis on transcribed audio
+        # Sentiment analysis on transcribed text
         if st.button("Run Sentiment Analysis on Audio"):
             sentences = transcript.split(". ")
             sentiments = []
@@ -66,7 +76,7 @@ if audio_file is not None:
     except Exception as e:
         st.error(f"Error processing audio file: {e}")
 
-# Text-based Conversation Section
+# Text-based conversation analysis
 st.subheader("Or Enter a Text-based Conversation")
 conversation = st.text_area("Conversation (each line is a new interaction)", height=200)
 
