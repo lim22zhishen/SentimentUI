@@ -26,18 +26,27 @@ def batch_analyze_sentiments(messages):
     return sentiments
 
 def transcribe_audio(audio_file_path):
+    """
+    Transcribes audio using OpenAI Whisper API.
+    
+    Args:
+        audio_file (file-like or str): Path to the audio file or a BytesIO object.
+        api_key (str): Your OpenAI API key.
+        
+    Returns:
+        str: Transcribed text, or None if an error occurs.
+    """
     try:
-        # Open the audio file
-        with open(audio_file_path, "rb") as audio_file:
-            # Call the Whisper API
-            response = openai.Audio.transcribe(
-                model="whisper-1",
-                file=audio_file
-            )
-        # Return the transcribed text
+        # If audio_file is a path, open the file
+        if isinstance(audio_file, (str, bytes, os.PathLike)):
+            with open(audio_file, "rb") as audio_file_obj:
+                response = openai.Audio.transcribe("whisper-1", audio_file_obj)
+        else:
+            # Assume it's a file-like object (e.g., BytesIO)
+            response = openai.Audio.transcribe("whisper-1", audio_file)
         return response["text"]
-    except openai.error.OpenAIError as e:
-        print(f"Error with OpenAI API: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
         return None
 
         
