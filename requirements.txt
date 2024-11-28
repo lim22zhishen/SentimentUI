@@ -8,4 +8,4 @@ tf_keras==2.17.0
 SpeechRecognition==3.10.0
 pyaudio==0.2.13
 streamlit==1.40.1
-openai == 0.28
+ffmpeg-python
