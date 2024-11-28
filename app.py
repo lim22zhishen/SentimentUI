@@ -9,6 +9,8 @@ from pydub.utils import mediainfo
 from io import BytesIO
 import openai
 
+openai.api_key = st.secrets['keys']
+
 # Use a smaller and lighter model (distilbert instead of XLM-Roberta)
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 
