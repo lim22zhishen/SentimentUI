@@ -7,6 +7,7 @@ import speech_recognition as sr
 from pydub import AudioSegment
 from pydub.utils import mediainfo
 from io import BytesIO
+import openai
 
 # Use a smaller and lighter model (distilbert instead of XLM-Roberta)
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
@@ -24,21 +25,21 @@ def batch_analyze_sentiments(messages):
     ]
     return sentiments
 
-# Function to transcribe audio using SpeechRecognition
-def transcribe_audio(audio_file):
-    recognizer = sr.Recognizer()
-    with sr.AudioFile(audio_file) as source:
-        audio_data = recognizer.record(source)
+def transcribe_audio(audio_file_path):
     try:
-        # Recognize the speech in the audio file
-        text = recognizer.recognize_google(audio_data)
-        return text
-    except sr.UnknownValueError:
-        st.error("Sorry, I couldn't understand the audio.")
+        # Open the audio file
+        with open(audio_file_path, "rb") as audio_file:
+            # Call the Whisper API
+            response = openai.Audio.transcribe(
+                model="whisper-1",
+                file=audio_file
+            )
+        # Return the transcribed text
+        return response["text"]
+    except openai.error.OpenAIError as e:
+        print(f"Error with OpenAI API: {e}")
         return None
-    except sr.RequestError:
-        st.error("Sorry, there was an error with the speech recognition service.")
-        return None
+
         
 # Streamlit UI
 st.title("Sentiment Analysis of Customer Conversations")
