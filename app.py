@@ -133,8 +133,9 @@ if st.button('Run Sentiment Analysis'):
         audio_data = audio_file.read()
         audio = BytesIO(audio_data)
 
-        # Transcribe the audio
-        transcript = transcribe_audio(audio)
+        # Display a spinner while processing
+        with st.spinner("Transcribing audio, please wait..."):
+            transcript = transcribe_audio(audio)
 
         if transcript:
             # Process the transcribed text for sentiment analysis
