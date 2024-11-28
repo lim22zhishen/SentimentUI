@@ -3,14 +3,12 @@ from transformers import pipeline
 import pandas as pd
 import plotly.express as px
 import datetime
-import os
 import speech_recognition as sr
-from pydub import AudioSegment
 
-# Initialize the sentiment analysis pipeline
+# Use a smaller and lighter model (distilbert instead of XLM-Roberta)
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 
-# Function to analyze sentiment of each sentence
+# Function to analyze sentiment of each sentence in a memory-efficient way
 def analyze_sentiment(text):
     result = sentiment_pipeline(text)[0]
     label = result['label']
@@ -18,87 +16,96 @@ def analyze_sentiment(text):
     
     # Map score to -5 to 5 scale
     if label == "POSITIVE":
-        new_score = 5 * (score - 0.5) / 0.5
-    else:
-        new_score = -5 * (1 - score) / 0.5
+        # Scale the score from 0.5 to 1 to 0 to 5
+        new_score = 5 * (score - 0.5) / 0.5  # Scaling
+    else:  # Assuming it's NEGATIVE
+        # Scale the score from 0 to 0.5 to 0 to -5
+        new_score = -5 * (1 - score) / 0.5  # Scaling
 
-    return label, round(new_score, 2)
+    return label, round(new_score, 2)  # Return rounded score for readability
 
-# Function to transcribe audio using SpeechRecognition library
+# Function to transcribe audio to text
 def transcribe_audio(audio_file):
     recognizer = sr.Recognizer()
-    
-    # Convert audio file to WAV if it's in another format
-    audio = AudioSegment.from_file(audio_file)
-    audio = audio.set_channels(1).set_frame_rate(16000)  # Mono channel, 16kHz for compatibility
-    
-    with open("temp.wav", "wb") as f:
-        audio.export(f, format="wav")
-    
-    with sr.AudioFile("temp.wav") as source:
+    with sr.AudioFile(audio_file) as source:
         audio_data = recognizer.record(source)
-        try:
-            text = recognizer.recognize_google(audio_data)
-            return text
-        except sr.UnknownValueError:
-            return "Could not transcribe the audio"
-        except sr.RequestError:
-            return "STT service is unavailable"
-            
+    try:
+        return recognizer.recognize_google(audio_data)
+    except sr.UnknownValueError:
+        return "Could not understand the audio."
+    except sr.RequestError as e:
+        return f"Error with the speech recognition service: {e}"
+
 # Streamlit UI
 st.title("Sentiment Analysis of Customer Conversations (Text and Audio)")
 
-# Text Input Section
-st.write("### Text Input")
-conversation = st.text_area("Enter a text-based conversation (each line is a new interaction):", height=200)
+# Option to upload an audio file
+st.subheader("Upload an Audio File")
+audio_file = st.file_uploader("Choose an audio file", type=["wav", "mp3"])
 
-# Audio Input Section
-st.write("### Audio Input")
-audio_file = st.file_uploader("Upload an audio file (WAV, MP3)", type=["wav", "mp3"])
-
-# If audio is uploaded, transcribe it
-if audio_file:
+# Process uploaded audio file
+if audio_file is not None:
     st.write("Transcribing audio...")
-    transcribed_text = transcribe_audio(audio_file)
-    st.write("Transcribed Text:", transcribed_text)
-    conversation = transcribed_text
+    transcript = transcribe_audio(audio_file)
+    st.write("Transcription:")
+    st.text_area("Transcript", transcript, height=150, disabled=True)
 
-# Run sentiment analysis on text input
-if st.button('Run Sentiment Analysis') and conversation:
-    # Split conversation into separate messages (lines)
-    messages = conversation.split("\n")
-    
-    # Limit processing of large conversations
-    MAX_MESSAGES = 20
-    if len(messages) > MAX_MESSAGES:
-        st.warning(f"Only analyzing the first {MAX_MESSAGES} messages for memory efficiency.")
-        messages = messages[:MAX_MESSAGES]
+    # Sentiment analysis on transcribed audio
+    if st.button('Run Sentiment Analysis on Audio'):
+        if transcript.strip():
+            # Split transcript into sentences for sentiment analysis
+            sentences = transcript.split(". ")
+            sentiments = []
+            for sentence in sentences:
+                if sentence.strip():  # Ignore empty lines
+                    label, score = analyze_sentiment(sentence)
+                    sentiments.append({
+                        "Timestamp": datetime.datetime.now(), 
+                        "Message": sentence, 
+                        "Sentiment": label, 
+                        "Score": score
+                    })
 
-    # Analyze each message for sentiment
-    sentiments = []
-    for msg in messages:
-        if msg.strip():  # Ignore empty lines
-            label, score = analyze_sentiment(msg)
-            if ": " in msg:
-                speaker, content = msg.split(": ", 1)
-            else:
-                speaker, content = "Unknown", msg
+            # Convert results into a DataFrame
+            df = pd.DataFrame(sentiments)
 
-            sentiments.append({
-                "Timestamp": datetime.datetime.now(),
-                "Speaker": speaker,
-                "Message": content,
-                "Sentiment": label,
-                "Score": round(score, 2)
-            })
+            # Display the results
+            st.write("Sentiment Analysis Results:")
+            st.table(df)
 
-    # Display results in DataFrame
-    df = pd.DataFrame(sentiments)
-    st.write("Conversation with Sentiment Labels:")
-    st.table(df)
+            # Plot sentiment over time using Plotly
+            fig = px.line(df, x='Timestamp', y='Score', color='Sentiment', title="Sentiment Score Over Time", markers=True)
+            st.plotly_chart(fig)
 
-    # Plot sentiment over time
-    fig = px.line(df, x='Timestamp', y='Score', color='Sentiment', title="Sentiment Score Over Time", markers=True)
-    st.plotly_chart(fig)
-else:
-    st.warning("Please enter text or upload audio before running the analysis.")
+# Input section for text-based conversation
+st.subheader("Or Enter a Text-based Conversation")
+conversation = st.text_area("Conversation (each line is a new interaction)", height=200)
+
+# Add a button to run sentiment analysis on text
+if st.button('Run Sentiment Analysis on Text'):
+    if conversation.strip():
+        # Split conversation into separate messages
+        messages = conversation.split("\n")
+        sentiments = []
+        for msg in messages:
+            if msg.strip():
+                label, score = analyze_sentiment(msg)
+                sentiments.append({
+                    "Timestamp": datetime.datetime.now(),
+                    "Message": msg,
+                    "Sentiment": label,
+                    "Score": score
+                })
+
+        # Convert the results into a DataFrame
+        df = pd.DataFrame(sentiments)
+
+        # Display the results
+        st.write("Sentiment Analysis Results:")
+        st.table(df)
+
+        # Plot sentiment over time using Plotly
+        fig = px.line(df, x='Timestamp', y='Score', color='Sentiment', title="Sentiment Score Over Time", markers=True)
+        st.plotly_chart(fig)
+    else:
+        st.warning("Please enter a conversation before running the analysis.")
