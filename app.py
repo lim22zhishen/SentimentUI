@@ -1,78 +1,108 @@
 import streamlit as st
-from transformers import pipeline
 import pandas as pd
 import plotly.express as px
 import datetime
-import os
+import whisper
+from transformers import pipeline
 
-# Use a smaller and lighter model (distilbert instead of XLM-Roberta)
+# Load Whisper model and sentiment analysis pipeline
+whisper_model = whisper.load_model("base")  # You can use "tiny", "base", "small", "medium", "large"
 sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
 
-# Function to analyze sentiment of each sentence in a memory-efficient way
+# Function to transcribe audio
+def transcribe_audio_whisper(audio_path):
+    result = whisper_model.transcribe(audio_path)
+    return result["text"]
+
+# Function to analyze sentiment
 def analyze_sentiment(text):
     result = sentiment_pipeline(text)[0]
     label = result['label']
     score = result['score']
-    
+
     # Map score to -5 to 5 scale
     if label == "POSITIVE":
-        # Scale the score from 0.5 to 1 to 0 to 5
-        new_score = 5 * (score - 0.5) / 0.5  # Scaling
-    else:  # Assuming it's NEGATIVE
-        # Scale the score from 0 to 0.5 to 0 to -5
-        new_score = -5 * (1 - score) / 0.5  # Scaling
+        new_score = 5 * (score - 0.5) / 0.5
+    else:
+        new_score = -5 * (1 - score) / 0.5
 
-    return label, round(new_score, 2)  # Return rounded score for readability
-    
+    return label, round(new_score, 2)
+
 # Streamlit UI
-st.title("Sentiment Analysis of Customer Conversations")
+st.title("Sentiment Analysis with OpenAI Whisper (Audio and Text)")
 
-# Input section for customer service conversation
-st.write("Enter a customer service conversation (each line is a new interaction between customer and service agent):")
-conversation = st.text_area("Conversation", height=300, placeholder="Enter customer-service interaction here...")
+# Upload audio file
+st.subheader("Upload an Audio File")
+audio_file = st.file_uploader("Choose an audio file (e.g., WAV, MP3, etc.)", type=["wav", "mp3", "m4a"])
 
-# Add a button to run the analysis
-if st.button('Run Sentiment Analysis'):
-    if conversation:
-        # Split conversation into separate messages (lines) for chunked processing
+if audio_file is not None:
+    # Save audio file locally
+    audio_path = f"temp_audio.{audio_file.name.split('.')[-1]}"
+    with open(audio_path, "wb") as f:
+        f.write(audio_file.read())
+    
+    # Transcribe audio
+    st.write("Transcribing audio using OpenAI Whisper...")
+    try:
+        transcript = transcribe_audio_whisper(audio_path)
+        st.write("Transcription:")
+        st.text_area("Transcript", transcript, height=150, disabled=True)
+
+        # Sentiment analysis on transcribed text
+        if st.button("Run Sentiment Analysis on Audio"):
+            sentences = transcript.split(". ")
+            sentiments = []
+            for sentence in sentences:
+                if sentence.strip():
+                    label, score = analyze_sentiment(sentence)
+                    sentiments.append({
+                        "Timestamp": datetime.datetime.now(),
+                        "Message": sentence,
+                        "Sentiment": label,
+                        "Score": score
+                    })
+
+            # Convert results into a DataFrame
+            df = pd.DataFrame(sentiments)
+
+            # Display results
+            st.write("Sentiment Analysis Results:")
+            st.table(df)
+
+            # Plot sentiment over time
+            fig = px.line(df, x="Timestamp", y="Score", color="Sentiment", title="Sentiment Score Over Time", markers=True)
+            st.plotly_chart(fig)
+
+    except Exception as e:
+        st.error(f"Error processing audio file: {e}")
+
+# Text-based conversation analysis
+st.subheader("Or Enter a Text-based Conversation")
+conversation = st.text_area("Conversation (each line is a new interaction)", height=200)
+
+if st.button("Run Sentiment Analysis on Text"):
+    if conversation.strip():
         messages = conversation.split("\n")
-        
-        # Limit processing of large conversations (for memory optimization)
-        MAX_MESSAGES = 20  # Only process up to 20 messages at once (modify if needed)
-        if len(messages) > MAX_MESSAGES:
-            st.warning(f"Only analyzing the first {MAX_MESSAGES} messages for memory efficiency.")
-            messages = messages[:MAX_MESSAGES]
-
-        # Analyze each message for sentiment in small chunks
         sentiments = []
         for msg in messages:
-            if msg.strip():  # Ignore empty lines
+            if msg.strip():
                 label, score = analyze_sentiment(msg)
-                
-                # Split each message into speaker and message (for improved readability)
-                if ": " in msg:
-                    speaker, content = msg.split(": ", 1)
-                else:
-                    speaker, content = "Unknown", msg
-
                 sentiments.append({
-                    "Timestamp": datetime.datetime.now(), 
-                    "Speaker": speaker, 
-                    "Message": content, 
-                    "Sentiment": label, 
-                    "Score": round(score, 2)
+                    "Timestamp": datetime.datetime.now(),
+                    "Message": msg,
+                    "Sentiment": label,
+                    "Score": score
                 })
 
-        # Convert the results into a DataFrame
+        # Convert results into a DataFrame
         df = pd.DataFrame(sentiments)
 
-        # Display the DataFrame in a readable table format
-        st.write("Conversation with Sentiment Labels:")
+        # Display results
+        st.write("Sentiment Analysis Results:")
         st.table(df)
 
-        # Plot sentiment over time using Plotly (optimize for small datasets)
-        fig = px.line(df, x='Timestamp', y='Score', color='Sentiment', title="Sentiment Score Over Time", markers=True)
+        # Plot sentiment over time
+        fig = px.line(df, x="Timestamp", y="Score", color="Sentiment", title="Sentiment Score Over Time", markers=True)
         st.plotly_chart(fig)
-
     else:
         st.warning("Please enter a conversation before running the analysis.")
