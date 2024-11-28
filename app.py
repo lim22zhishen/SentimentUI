@@ -27,27 +27,19 @@ def batch_analyze_sentiments(messages):
 # Function to transcribe audio using SpeechRecognition
 def transcribe_audio(audio_file):
     recognizer = sr.Recognizer()
-    
-    # Convert BytesIO to PCM WAV if necessary
-    try:
-        audio = AudioSegment.from_file(audio_file)
-        audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)  # Convert to PCM WAV
-        audio_file_path = "/tmp/temp_audio.wav"
-        audio.export(audio_file_path, format="wav")
-    except Exception as e:
-        raise ValueError(f"Audio conversion failed: {e}")
-    
-    # Read and process the WAV file
-    with sr.AudioFile(audio_file_path) as source:
+    with sr.AudioFile(audio_file) as source:
         audio_data = recognizer.record(source)
     try:
+        # Recognize the speech in the audio file
         text = recognizer.recognize_google(audio_data)
         return text
     except sr.UnknownValueError:
-        return "Could not understand the audio."
-    except sr.RequestError as e:
-        return f"Speech recognition service error: {e}"
-
+        st.error("Sorry, I couldn't understand the audio.")
+        return None
+    except sr.RequestError:
+        st.error("Sorry, there was an error with the speech recognition service.")
+        return None
+        
 # Streamlit UI
 st.title("Sentiment Analysis of Customer Conversations")
 
