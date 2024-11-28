@@ -10,3 +10,4 @@ ffmpeg-python
 openai-whisper
 whisper==1.1.10
 tf_keras==2.17.0
+pydub==0.25.1
