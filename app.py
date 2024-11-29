@@ -27,7 +27,7 @@ def batch_analyze_sentiments(messages):
     ]
     return sentiments
 
-def transcribe_audio(audio_file_path):
+def transcribe_audio(audio_file):
     """
     Transcribes audio using OpenAI Whisper API.
     
