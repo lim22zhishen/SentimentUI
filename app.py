@@ -32,20 +32,27 @@ def transcribe_audio(audio_file):
     Transcribes audio using OpenAI Whisper API.
     
     Args:
-        audio_file (file-like or str): Path to the audio file or a BytesIO object.
-        api_key (str): Your OpenAI API key.
+        audio_file: A file-like object (e.g., BytesIO).
         
     Returns:
         str: Transcribed text, or None if an error occurs.
     """
     try:
-        # Directly use the uploaded audio file without conversion
-        response = openai.Audio.transcribe("whisper-1", audio_file)
+        # Export audio to a compatible format if necessary
+        audio_segment = AudioSegment.from_file(audio_file)
+        buffer = BytesIO()
+        audio_segment.export(buffer, format="wav")  # Convert to WAV format
+        buffer.seek(0)
+
+        # Add a file name for the BytesIO object (required by OpenAI Whisper)
+        buffer.name = "audio.wav"  # Assign a mock name
+
+        # Transcribe using Whisper API
+        response = openai.Audio.transcribe("whisper-1", buffer)
         return response.get("text", "")
     except Exception as e:
         st.error(f"An error occurred during transcription: {e}")
         return None
-
         
 # Streamlit UI
 st.title("Sentiment Analysis of Customer Conversations")
