@@ -6,10 +6,10 @@ plotly==5.24.1
 tensorflow==2.17.0
 SpeechRecognition==3.10.0
 streamlit==1.40.2
-ffmpeg-python
 openai-whisper
 whisper==1.1.10
 tf_keras==2.17.0
 pydub==0.25.1
 openai==0.28
-ffmpeg
+ffmpeg==1.4
+
