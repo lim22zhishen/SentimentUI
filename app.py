@@ -39,14 +39,8 @@ def transcribe_audio(audio_file):
         str: Transcribed text, or None if an error occurs.
     """
     try:
-        # Ensure the audio is in the correct format (e.g., WAV)
-        audio = AudioSegment.from_file(audio_file)
-        buffer = BytesIO()
-        audio.export(buffer, format="wav")
-        buffer.seek(0)
-
-        # Transcribe using OpenAI Whisper
-        response = openai.Audio.transcribe("whisper-1", buffer)
+        # Directly use the uploaded audio file without conversion
+        response = openai.Audio.transcribe("whisper-1", audio_file)
         return response.get("text", "")
     except Exception as e:
         st.error(f"An error occurred during transcription: {e}")
