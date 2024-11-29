@@ -39,16 +39,17 @@ def transcribe_audio(audio_file):
         str: Transcribed text, or None if an error occurs.
     """
     try:
-        # If audio_file is a path, open the file
-        if isinstance(audio_file, (str, bytes, os.PathLike)):
-            with open(audio_file, "rb") as audio_file_obj:
-                response = openai.Audio.transcribe("whisper-1", audio_file_obj)
-        else:
-            # Assume it's a file-like object (e.g., BytesIO)
-            response = openai.Audio.transcribe("whisper-1", audio_file)
-        return response["text"]
+        # Ensure the audio is in the correct format (e.g., WAV)
+        audio = AudioSegment.from_file(audio_file)
+        buffer = BytesIO()
+        audio.export(buffer, format="wav")
+        buffer.seek(0)
+
+        # Transcribe using OpenAI Whisper
+        response = openai.Audio.transcribe("whisper-1", buffer)
+        return response.get("text", "")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        st.error(f"An error occurred during transcription: {e}")
         return None
 
         
