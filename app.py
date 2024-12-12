@@ -16,7 +16,13 @@ sentiment_pipeline = pipeline("sentiment-analysis", model="distilbert-base-uncas
 
 # Function to scale sentiment scores
 def scale_score(label, score):
-    return 5 * (score - 0.5) / 0.5 if label == "POSITIVE" else -5 * (1 - score) / 0.5
+    midpoint = 0.5
+    scale_factor = 5
+    if label == "POSITIVE":
+        return scale_factor * (score - midpoint) / (1 - midpoint)
+    else:
+        return -scale_factor * (midpoint - score) / midpoint
+
 
 # Function to analyze sentiment in batches
 def batch_analyze_sentiments(messages):
